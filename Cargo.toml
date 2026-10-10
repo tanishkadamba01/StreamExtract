@@ -1,0 +1,57 @@
+[workspace]
+members = [
+    "streamextract-core",
+    "streamextract-cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["StreamExtract Contributors"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/streamextract/streamextract"
+rust-version = "1.80"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.45", features = ["full"] }
+tokio-util = { version = "0.7", features = ["io"] }
+
+# Archive formats (pure Rust, no C dependencies for Phase 1)
+zip = { version = "2.4", features = ["deflate", "bzip2", "zstd"] }
+tar = "0.4"
+flate2 = { version = "1.0", features = ["rust_backend"] }
+bzip2 = "0.4"
+ctrlc = "3.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive", "color", "env"] }
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+tempfile = "3.14"
+hex = "0.4"
+crc32fast = "1.4"
+
+# Windows platform APIs — listed here as workspace deps for use in member crates.
+# The platform-conditional dependency is expressed in each member's Cargo.toml.
+windows = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+] }

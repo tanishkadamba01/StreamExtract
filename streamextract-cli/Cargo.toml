@@ -1,0 +1,18 @@
+[package]
+name = "streamextract-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "streamextract"
+path = "src/main.rs"
+
+[dependencies]
+streamextract-core = { path = "../streamextract-core" }
+clap = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+ctrlc = { workspace = true }
