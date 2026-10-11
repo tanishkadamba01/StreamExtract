@@ -12,7 +12,9 @@ use std::path::Path;
 /// Platform-specific implementation of volume space query.
 pub fn query_volume_space_impl(path: &Path) -> Result<VolumeSpace> {
     // Determine a path that actually exists so we can query its volume.
-    let query_path = find_existing_ancestor(path).unwrap_or_else(std::env::temp_dir);
+    let query_path = find_existing_ancestor(path).unwrap_or_else(|| {
+        std::env::current_dir().unwrap_or_else(|_| std::env::temp_dir())
+    });
     query_available_space(&query_path)
 }
 
@@ -43,19 +45,61 @@ fn query_windows(path: &Path) -> Result<VolumeSpace> {
     use windows::core::PCWSTR;
     use windows::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
 
-    // Build a null-terminated wide string for the path.
+    let try_query = |wide_ptr: *const u16| -> std::result::Result<VolumeSpace, windows::core::Error> {
+        let mut free_bytes_available: u64 = 0;
+        let mut total_number_of_bytes: u64 = 0;
+        let mut total_number_of_free_bytes: u64 = 0;
+
+        unsafe {
+            GetDiskFreeSpaceExW(
+                PCWSTR(wide_ptr),
+                Some(&mut free_bytes_available),
+                Some(&mut total_number_of_bytes),
+                Some(&mut total_number_of_free_bytes),
+            )?;
+        }
+
+        Ok(VolumeSpace {
+            available_bytes: free_bytes_available,
+            total_bytes: total_number_of_bytes,
+        })
+    };
+
+    // 1. Try querying the exact path.
     let wide: Vec<u16> = path
         .as_os_str()
         .encode_wide()
         .chain(std::iter::once(0u16))
         .collect();
 
+    if let Ok(space) = try_query(wide.as_ptr()) {
+        return Ok(space);
+    }
+
+    // 2. If querying the directory failed (e.g. ERROR_ACCESS_DENIED because the caller
+    // lacks FILE_LIST_DIRECTORY permissions on that specific folder), fall back to
+    // querying the volume root (e.g. "C:\").
+    if let Some(volume_root) = get_volume_root(path) {
+        let root_wide: Vec<u16> = volume_root
+            .as_os_str()
+            .encode_wide()
+            .chain(std::iter::once(0u16))
+            .collect();
+        if let Ok(space) = try_query(root_wide.as_ptr()) {
+            return Ok(space);
+        }
+    }
+
+    // 3. Fall back to querying the default directory (pass NULL to GetDiskFreeSpaceExW).
+    if let Ok(space) = try_query(std::ptr::null()) {
+        return Ok(space);
+    }
+
+    // If all attempts failed, repeat the original call to capture the actual Windows error.
     let mut free_bytes_available: u64 = 0;
     let mut total_number_of_bytes: u64 = 0;
     let mut total_number_of_free_bytes: u64 = 0;
 
-    // SAFETY: `wide` is a valid null-terminated UTF-16 string. All pointer
-    // arguments are valid stack-allocated u64 targets.
     unsafe {
         GetDiskFreeSpaceExW(
             PCWSTR(wide.as_ptr()),
@@ -76,6 +120,20 @@ fn query_windows(path: &Path) -> Result<VolumeSpace> {
         available_bytes: free_bytes_available,
         total_bytes: total_number_of_bytes,
     })
+}
+
+#[cfg(windows)]
+fn get_volume_root(path: &Path) -> Option<std::path::PathBuf> {
+    use std::path::Component;
+    let mut components = path.components();
+    match components.next()? {
+        Component::Prefix(prefix) => {
+            let mut root = std::path::PathBuf::from(prefix.as_os_str());
+            root.push(std::path::MAIN_SEPARATOR.to_string());
+            Some(root)
+        }
+        _ => None,
+    }
 }
 
 #[cfg(not(windows))]

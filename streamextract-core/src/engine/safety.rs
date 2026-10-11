@@ -175,41 +175,43 @@ fn validate_component(entry: &str, component: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
-
-    fn dest() -> TempDir {
-        TempDir::new().unwrap()
+    fn dest() -> &'static Path {
+        if cfg!(windows) {
+            Path::new(r"C:\safe\extraction\dest")
+        } else {
+            Path::new("/safe/extraction/dest")
+        }
     }
 
     #[test]
     fn safe_relative_path_is_accepted() {
         let d = dest();
-        let result = sanitise_path("subdir/file.txt", d.path());
+        let result = sanitise_path("subdir/file.txt", d);
         assert!(result.is_ok(), "{result:?}");
-        assert!(result.unwrap().starts_with(d.path()));
+        assert!(result.unwrap().starts_with(d));
     }
 
     #[test]
     fn path_traversal_is_rejected() {
         let d = dest();
-        assert!(sanitise_path("../etc/passwd", d.path()).is_err());
-        assert!(sanitise_path("ok/../../../etc/passwd", d.path()).is_err());
-        assert!(sanitise_path("a/b/../../..", d.path()).is_err());
+        assert!(sanitise_path("../etc/passwd", d).is_err());
+        assert!(sanitise_path("ok/../../../etc/passwd", d).is_err());
+        assert!(sanitise_path("a/b/../../..", d).is_err());
     }
 
     #[test]
     fn absolute_path_is_rejected() {
         let d = dest();
         // On Windows, both Unix and Windows absolute paths must be rejected.
-        assert!(sanitise_path("/etc/passwd", d.path()).is_err());
-        assert!(sanitise_path("C:\\Windows\\System32\\drivers", d.path()).is_err());
+        assert!(sanitise_path("/etc/passwd", d).is_err());
+        assert!(sanitise_path("C:\\Windows\\System32\\drivers", d).is_err());
     }
 
     #[test]
     fn unc_path_is_rejected() {
         let d = dest();
-        assert!(sanitise_path("\\\\server\\share\\file", d.path()).is_err());
-        assert!(sanitise_path("//server/share/file", d.path()).is_err());
+        assert!(sanitise_path("\\\\server\\share\\file", d).is_err());
+        assert!(sanitise_path("//server/share/file", d).is_err());
     }
 
     #[test]
@@ -217,13 +219,13 @@ mod tests {
         let d = dest();
         for name in &["NUL", "CON", "PRN", "AUX", "COM1", "LPT9"] {
             assert!(
-                sanitise_path(name, d.path()).is_err(),
+                sanitise_path(name, d).is_err(),
                 "expected '{name}' to be rejected"
             );
             // Also reject with extension.
             let with_ext = format!("{name}.txt");
             assert!(
-                sanitise_path(&with_ext, d.path()).is_err(),
+                sanitise_path(&with_ext, d).is_err(),
                 "expected '{with_ext}' to be rejected"
             );
         }
@@ -235,7 +237,7 @@ mod tests {
         for ch in &['<', '>', ':', '"', '|', '?', '*'] {
             let name = format!("file{ch}name.txt");
             assert!(
-                sanitise_path(&name, d.path()).is_err(),
+                sanitise_path(&name, d).is_err(),
                 "expected '{name}' to be rejected"
             );
         }
@@ -244,32 +246,32 @@ mod tests {
     #[test]
     fn empty_path_is_rejected() {
         let d = dest();
-        assert!(sanitise_path("", d.path()).is_err());
+        assert!(sanitise_path("", d).is_err());
     }
 
     #[test]
     fn trailing_dot_is_rejected() {
         let d = dest();
-        assert!(sanitise_path("file.", d.path()).is_err());
+        assert!(sanitise_path("file.", d).is_err());
     }
 
     #[test]
     fn trailing_space_is_rejected() {
         let d = dest();
-        assert!(sanitise_path("file ", d.path()).is_err());
+        assert!(sanitise_path("file ", d).is_err());
     }
 
     #[test]
     fn unicode_filenames_are_accepted() {
         let d = dest();
-        let result = sanitise_path("文档/报告.txt", d.path());
+        let result = sanitise_path("文档/报告.txt", d);
         assert!(result.is_ok(), "{result:?}");
     }
 
     #[test]
     fn deep_directory_structure_is_accepted() {
         let d = dest();
-        let result = sanitise_path("a/b/c/d/e/f/g/file.txt", d.path());
+        let result = sanitise_path("a/b/c/d/e/f/g/file.txt", d);
         assert!(result.is_ok(), "{result:?}");
     }
 }

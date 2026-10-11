@@ -186,9 +186,37 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    fn test_dir() -> TempDir {
+        if let Some(cargo_tmp) = option_env!("CARGO_TARGET_TMPDIR") {
+            let path = std::path::Path::new(cargo_tmp);
+            let _ = fs::create_dir_all(path);
+            if let Ok(td) = tempfile::tempdir_in(path) {
+                return td;
+            }
+        }
+
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        if let Some(ws_root) = manifest_dir.parent() {
+            let ws_target_tmp = ws_root.join("target").join("tmp");
+            let _ = fs::create_dir_all(&ws_target_tmp);
+            if let Ok(td) = tempfile::tempdir_in(&ws_target_tmp) {
+                return td;
+            }
+        }
+
+        if let Ok(td) = TempDir::new() {
+            return td;
+        }
+
+        let crate_target_tmp = manifest_dir.join("target").join("tmp");
+        let _ = fs::create_dir_all(&crate_target_tmp);
+        tempfile::tempdir_in(&crate_target_tmp)
+            .expect("failed to create temporary test directory in any candidate location")
+    }
+
     #[test]
     fn creates_file_in_new_directory() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = test_dir();
         let dest = tmp.path().join("sub").join("file.txt");
         let result = open_output_file(&dest, &OverwritePolicy::Skip).unwrap();
         assert!(matches!(result, OutputFileResult::Opened { .. }));
@@ -197,7 +225,7 @@ mod tests {
 
     #[test]
     fn skip_policy_skips_existing_file() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = test_dir();
         let dest = tmp.path().join("file.txt");
         fs::write(&dest, b"original").unwrap();
         let result = open_output_file(&dest, &OverwritePolicy::Skip).unwrap();
@@ -207,7 +235,7 @@ mod tests {
 
     #[test]
     fn overwrite_policy_replaces_existing_file() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = test_dir();
         let dest = tmp.path().join("file.txt");
         fs::write(&dest, b"original").unwrap();
         let result = open_output_file(&dest, &OverwritePolicy::Overwrite).unwrap();
@@ -216,7 +244,7 @@ mod tests {
 
     #[test]
     fn abort_policy_errors_on_existing_file() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = test_dir();
         let dest = tmp.path().join("file.txt");
         fs::write(&dest, b"original").unwrap();
         let result = open_output_file(&dest, &OverwritePolicy::Abort);
@@ -225,7 +253,7 @@ mod tests {
 
     #[test]
     fn rename_policy_generates_new_name() {
-        let tmp = TempDir::new().unwrap();
+        let tmp = test_dir();
         let dest = tmp.path().join("file.txt");
         fs::write(&dest, b"original").unwrap();
         let result = open_output_file(&dest, &OverwritePolicy::Rename).unwrap();

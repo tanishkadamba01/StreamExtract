@@ -42,11 +42,27 @@ cargo build --bin streamextract
 ```
 
 ### 2. Inspect an archive
+Using `cargo run` (recommended across all platforms):
 ```bash
-target/debug/streamextract inspect <path-to-archive.zip>
+cargo run --bin streamextract -- inspect <path-to-archive.zip>
+```
+Or directly running the compiled binary:
+```bash
+# Windows PowerShell:
+.\target\x86_64-pc-windows-gnu\debug\streamextract.exe inspect <path-to-archive.zip>
+# Unix / default layout:
+./target/debug/streamextract inspect <path-to-archive.zip>
 ```
 
 ### 3. Extract to a destination
+Using `cargo run`:
 ```bash
-target/debug/streamextract extract <path-to-archive.zip> <path-to-dest> --overwrite skip
+cargo run --bin streamextract -- extract <path-to-archive.zip> <path-to-dest> --overwrite skip
+```
+Or directly running the compiled binary:
+```bash
+# Windows PowerShell:
+.\target\x86_64-pc-windows-gnu\debug\streamextract.exe extract <path-to-archive.zip> <path-to-dest> --overwrite skip
+# Unix / default layout:
+./target/debug/streamextract extract <path-to-archive.zip> <path-to-dest> --overwrite skip
 ```

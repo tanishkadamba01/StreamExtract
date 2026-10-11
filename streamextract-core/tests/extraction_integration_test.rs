@@ -36,9 +36,37 @@ fn create_sample_zip(path: &std::path::Path) {
     zip.finish().unwrap();
 }
 
+fn test_dir() -> TempDir {
+    if let Some(cargo_tmp) = option_env!("CARGO_TARGET_TMPDIR") {
+        let path = std::path::Path::new(cargo_tmp);
+        let _ = fs::create_dir_all(path);
+        if let Ok(td) = tempfile::tempdir_in(path) {
+            return td;
+        }
+    }
+
+    let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    if let Some(ws_root) = manifest_dir.parent() {
+        let ws_target_tmp = ws_root.join("target").join("tmp");
+        let _ = fs::create_dir_all(&ws_target_tmp);
+        if let Ok(td) = tempfile::tempdir_in(&ws_target_tmp) {
+            return td;
+        }
+    }
+
+    if let Ok(td) = TempDir::new() {
+        return td;
+    }
+
+    let crate_target_tmp = manifest_dir.join("target").join("tmp");
+    let _ = fs::create_dir_all(&crate_target_tmp);
+    tempfile::tempdir_in(&crate_target_tmp)
+        .expect("failed to create temporary test directory in any candidate location")
+}
+
 #[test]
 fn test_zip_inspection() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let zip_path = tmp.path().join("test.zip");
     create_sample_zip(&zip_path);
 
@@ -61,7 +89,7 @@ fn test_zip_inspection() {
 
 #[test]
 fn test_zip_streaming_extraction_success() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let zip_path = tmp.path().join("test.zip");
     let dest_dir = tmp.path().join("extracted");
     create_sample_zip(&zip_path);
@@ -96,7 +124,7 @@ fn test_zip_streaming_extraction_success() {
 
 #[test]
 fn test_zip_extraction_overwrite_policy_skip() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let zip_path = tmp.path().join("test.zip");
     let dest_dir = tmp.path().join("extracted");
     create_sample_zip(&zip_path);
@@ -120,7 +148,7 @@ fn test_zip_extraction_overwrite_policy_skip() {
 
 #[test]
 fn test_zip_extraction_cancellation() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let zip_path = tmp.path().join("test.zip");
     let dest_dir = tmp.path().join("extracted");
     create_sample_zip(&zip_path);
@@ -137,7 +165,7 @@ fn test_zip_extraction_cancellation() {
 
 #[test]
 fn test_tar_inspection_and_extraction() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let tar_path = tmp.path().join("test.tar");
     let dest_dir = tmp.path().join("tar_out");
 
@@ -182,7 +210,7 @@ fn test_tar_inspection_and_extraction() {
 
 #[test]
 fn test_security_path_traversal_rejection() {
-    let tmp = TempDir::new().unwrap();
+    let tmp = test_dir();
     let zip_path = tmp.path().join("evil.zip");
     let dest_dir = tmp.path().join("safe_out");
 
